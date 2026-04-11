@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inserimento lavori senza Excel</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Gestionale locale</p>
+        <h1>Inserimento lavori senza Excel</h1>
+        <p class="subtitle">Compila i campi da browser, salva in locale e genera esportazioni rapide in CSV o JSON.</p>
+      </div>
+      <div class="hero-actions">
+        <button id="exportCsvButton" class="secondary" type="button">Esporta CSV</button>
+        <button id="exportJsonButton" class="secondary" type="button">Esporta JSON</button>
+        <button id="resetArchiveButton" class="danger" type="button">Svuota archivio</button>
+      </div>
+    </header>
+
+    <section class="view-switch" role="tablist" aria-label="Sezioni applicazione">
+      <button class="view-tab active" data-view="operativita" type="button">Operativita'</button>
+      <button class="view-tab" data-view="analisi" type="button">Analisi</button>
+    </section>
+
+    <main>
+      <section id="view-operativita" class="app-view active-view">
+        <section class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <p class="section-label">Nuovo lavoro</p>
+              <h2>Compilazione</h2>
+            </div>
+
+            <form id="jobForm" class="entry-form">
+              <input id="jobIdHidden" type="hidden">
+
+              <label><span>ID lavoro</span><input id="jobCodeInput" type="text" inputmode="numeric" maxlength="8" pattern="\d{1,8}" placeholder="Es. 46082" required></label>
+              <label><span>Cliente</span><input id="jobClientInput" type="text" list="clientOptions" placeholder="Seleziona o scrivi un cliente" required></label>
+              <label><span>Lavorazione</span><input id="jobTypeInput" type="text" list="workTypeOptions" placeholder="Seleziona o scrivi una lavorazione" required></label>
+              <label><span>Operatore</span><input id="jobOperatorInput" type="text" list="operatorOptions" placeholder="Operatore assegnato"></label>
+              <label><span>Prezzo listino automatico (EUR)</span><input id="jobListPriceInput" type="number" min="0" step="0.01" placeholder="0,00"></label>
+              <label><span>Tempo standard (giorni)</span><input id="jobStandardDaysInput" type="number" min="0" step="1" value="4"></label>
+              <label><span>Quantita'</span><input id="jobQuantityInput" type="number" min="1" step="1" value="1"></label>
+              <label><span>Prezzo manuale applicato (EUR)</span><input id="jobAppliedPriceInput" type="number" min="0" step="0.01" placeholder="Se diverso dal listino"></label>
+              <label><span>Prezzo finale</span><input id="jobFinalPricePreview" type="text" value="Calcolato automaticamente" disabled></label>
+              <label>
+                <span>Stato lavoro</span>
+                <select id="jobStatusInput">
+                  <option value="In lavorazione">In lavorazione</option>
+                  <option value="In prova">In prova</option>
+                  <option value="Consegnato">Consegnato</option>
+                  <option value="Pronto">Pronto</option>
+                  <option value="Sospeso">Sospeso</option>
+                </select>
+              </label>
+              <label><span>Data ingresso</span><input id="jobEntryDateInput" type="date" required></label>
+              <label><span>Data consegna</span><input id="jobDeliveryDateInput" type="date"></label>
+              <label><span>Data uscita prova</span><input id="jobTrialOutDateInput" type="date"></label>
+              <label><span>Data rientro prova</span><input id="jobTrialReturnDateInput" type="date"></label>
+
+              <label class="checkbox-field"><input id="jobUrgentInput" type="checkbox"><span>Urgente</span></label>
+              <label class="checkbox-field"><input id="jobRedoInput" type="checkbox"><span>Rifacimento</span></label>
+
+              <label class="full-width"><span>Info listino</span><input id="jobPriceInfoInput" type="text" placeholder="Lavorazione libera o non presente nel listino"></label>
+
+              <div class="totals-grid full-width">
+                <article class="mini-total">
+                  <span>Totale listino</span>
+                  <strong id="jobListTotalValue">0,00 EUR</strong>
+                </article>
+                <article class="mini-total alert">
+                  <span>Totale applicato</span>
+                  <strong id="jobAppliedTotalValue">EUR 0,00</strong>
+                </article>
+              </div>
+
+              <label class="full-width"><span>Note</span><textarea id="jobNoteInput" rows="4" placeholder="Annotazioni sul lavoro"></textarea></label>
+
+              <div class="form-actions full-width">
+                <button type="submit">Salva lavoro</button>
+                <button id="cancelEditButton" class="secondary" type="button">Annulla modifica</button>
+              </div>
+            </form>
+
+            <datalist id="clientOptions"></datalist>
+            <datalist id="workTypeOptions"></datalist>
+            <datalist id="operatorOptions"></datalist>
+          </article>
+
+          <aside class="panel">
+            <div class="panel-heading">
+              <p class="section-label">Panoramica</p>
+              <h2>Filtri rapidi</h2>
+            </div>
+
+            <div class="stack-list">
+              <label>
+                <span>Ricerca commesse</span>
+                <small>Filtro commesse</small>
+                <select id="jobSearchInput">
+                  <option value="">Tutte le commesse</option>
+                  <option value="aperte">Aperte</option>
+                  <option value="in lavorazione">In lavorazione</option>
+                  <option value="in prova">In prova</option>
+                  <option value="da rientrare">Da rientrare</option>
+                  <option value="consegnato">Consegnate</option>
+                  <option value="urgenti">Urgenti</option>
+                  <option value="rifacimenti">Rifacimenti</option>
+                </select>
+              </label>
+              <label><span>Cliente</span><input id="jobClientFilterInput" type="search" placeholder="Filtra per cliente"></label>
+              <label>
+                <span>Operatore</span>
+                <select id="jobOperatorFilterInput">
+                  <option value="">Filtra per operatore</option>
+                </select>
+              </label>
+              <label>
+                <span>Urgenza</span>
+                <select id="jobUrgencyFilter">
+                  <option value="">Tutte</option>
+                  <option value="urgent">Solo urgenti</option>
+                  <option value="normal">No urgenti</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="filter-actions">
+              <button id="applyFiltersButton" type="button">Applica filtri</button>
+              <button id="resetFiltersButton" class="secondary" type="button">Azzera filtri</button>
+            </div>
+
+            <p id="filterStatus" class="hint-line">Nessun filtro attivo.</p>
+
+            <section class="recent-box">
+              <h3>Ultimi inserimenti</h3>
+              <ul id="recentEntriesList" class="compact-list"></ul>
+            </section>
+          </aside>
+        </section>
+
+        <section class="panel table-panel">
+          <div class="panel-heading archive-head">
+            <div>
+              <p class="section-label">Archivio</p>
+              <h2>Elenco lavori</h2>
+            </div>
+            <label class="table-search"><input id="tableSearchInput" type="search" placeholder="Cerca cliente, lavorazione, stato..."></label>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Cliente</th>
+                  <th>Lavorazione</th>
+                  <th>Stato</th>
+                  <th>Ingresso</th>
+                  <th>Consegna</th>
+                  <th>Urgente</th>
+                  <th>Rifacimento</th>
+                  <th>Totale</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="jobTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-analisi" class="app-view">
+        <section class="panel analysis-header">
+          <div class="panel-heading">
+            <p class="section-label">Analisi operative</p>
+            <h2>Controllo flusso e concentrazione</h2>
+          </div>
+
+          <div class="analysis-filter-grid">
+            <label><span>Inizio periodo</span><input id="analysisStartInput" type="date"></label>
+            <label><span>Fine periodo</span><input id="analysisEndInput" type="date"></label>
+          </div>
+
+          <div id="analysisKpiGrid" class="kpi-grid"></div>
+        </section>
+
+        <section class="analysis-chip-bar" id="analysisChipBar"></section>
+
+        <section class="workspace-grid analysis-detail-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <p class="section-label">Analisi selezionata</p>
+              <h2 id="analysisTitle">Lavori usciti in prova e non rientrati</h2>
+              <p id="analysisIntro" class="subtitle compact"></p>
+            </div>
+            <div id="analysisPrimary" class="chart-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading"><h2>Dettaglio</h2></div>
+            <ul id="analysisDetailList" class="detail-list"></ul>
+          </article>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="./seed-jobs.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
