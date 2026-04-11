@@ -42,10 +42,10 @@
               <label><span>Cliente</span><input id="jobClientInput" type="text" list="clientOptions" placeholder="Seleziona o scrivi un cliente" required></label>
               <label><span>Lavorazione</span><input id="jobTypeInput" type="text" list="workTypeOptions" placeholder="Seleziona o scrivi una lavorazione" required></label>
               <label><span>Operatore</span><input id="jobOperatorInput" type="text" list="operatorOptions" placeholder="Operatore assegnato"></label>
-              <label><span>Prezzo listino automatico (EUR)</span><input id="jobListPriceInput" type="number" min="0" step="0.01" placeholder="0,00"></label>
+              <label><span>Prezzo listino automatico (EUR)</span><input id="jobListPriceInput" type="text" inputmode="decimal" placeholder="0,00" readonly></label>
               <label><span>Tempo standard (giorni)</span><input id="jobStandardDaysInput" type="number" min="0" step="1" value="4"></label>
               <label><span>Quantita'</span><input id="jobQuantityInput" type="number" min="1" step="1" value="1"></label>
-              <label><span>Prezzo manuale applicato (EUR)</span><input id="jobAppliedPriceInput" type="number" min="0" step="0.01" placeholder="Se diverso dal listino"></label>
+              <label><span>Prezzo manuale applicato (EUR)</span><input id="jobAppliedPriceInput" type="text" inputmode="decimal" placeholder="Se diverso dal listino"></label>
               <label><span>Prezzo finale</span><input id="jobFinalPricePreview" type="text" value="Calcolato automaticamente" disabled></label>
               <label>
                 <span>Stato lavoro</span>
@@ -87,6 +87,7 @@
             </form>
 
             <datalist id="clientOptions"></datalist>
+            <datalist id="clientFilterOptions"></datalist>
             <datalist id="workTypeOptions"></datalist>
             <datalist id="operatorOptions"></datalist>
           </article>
@@ -112,7 +113,7 @@
                   <option value="rifacimenti">Rifacimenti</option>
                 </select>
               </label>
-              <label><span>Cliente</span><input id="jobClientFilterInput" type="search" placeholder="Filtra per cliente"></label>
+              <label><span>Cliente</span><input id="jobClientFilterInput" type="search" list="clientFilterOptions" placeholder="Filtra per cliente"></label>
               <label>
                 <span>Operatore</span>
                 <select id="jobOperatorFilterInput">
@@ -149,7 +150,10 @@
               <p class="section-label">Archivio</p>
               <h2>Elenco lavori</h2>
             </div>
-            <label class="table-search"><input id="tableSearchInput" type="search" placeholder="Cerca cliente, lavorazione, stato..."></label>
+            <label class="table-search table-search-primary">
+              <span>Ricerca rapida per ID lavoro, cliente o lavorazione</span>
+              <input id="tableSearchInput" type="search" placeholder="Es. 31030941 oppure cliente, lavorazione, stato...">
+            </label>
           </div>
 
           <div class="table-wrap">
@@ -172,6 +176,11 @@
             </table>
           </div>
         </section>
+
+        <section class="view-switch view-switch-repeat" role="tablist" aria-label="Cambio vista rapido fondo operativita">
+          <button class="view-tab active" data-view="operativita" type="button">Operativita'</button>
+          <button class="view-tab" data-view="analisi" type="button">Analisi</button>
+        </section>
       </section>
 
       <section id="view-analisi" class="app-view">
@@ -191,22 +200,30 @@
 
         <section class="analysis-chip-bar" id="analysisChipBar"></section>
 
-        <section class="workspace-grid analysis-detail-grid">
-          <article class="panel">
-            <div class="panel-heading">
-              <p class="section-label">Analisi selezionata</p>
-              <h2 id="analysisTitle">Lavori usciti in prova e non rientrati</h2>
+          <section class="workspace-grid analysis-detail-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <p class="section-label">Analisi selezionata</p>
+                <h2 id="analysisTitle">Lavori usciti in prova e non rientrati</h2>
               <p id="analysisIntro" class="subtitle compact"></p>
             </div>
             <div id="analysisPrimary" class="chart-list"></div>
           </article>
 
-          <article class="panel">
-            <div class="panel-heading"><h2>Dettaglio</h2></div>
-            <ul id="analysisDetailList" class="detail-list"></ul>
-          </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h2>Dettaglio</h2>
+                <label class="table-search analysis-detail-search"><input id="analysisDetailSearchInput" type="search" placeholder="Cerca nel dettaglio o seleziona una riga a sinistra"></label>
+              </div>
+              <ul id="analysisDetailList" class="detail-list"></ul>
+            </article>
+          </section>
+
+          <section class="view-switch view-switch-repeat" role="tablist" aria-label="Cambio vista rapido fondo analisi">
+            <button class="view-tab" data-view="operativita" type="button">Operativita'</button>
+            <button class="view-tab active" data-view="analisi" type="button">Analisi</button>
+          </section>
         </section>
-      </section>
     </main>
   </div>
 
