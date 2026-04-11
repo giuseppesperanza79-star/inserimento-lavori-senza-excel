@@ -697,6 +697,16 @@ td:last-child {
     border-bottom: 1px solid rgba(126, 57, 24, 0.08);
   }
 
+  .sla-summary-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-dark);
+  }
+
   .chip-button {
     flex: 0 0 auto;
     white-space: nowrap;

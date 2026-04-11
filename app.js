@@ -489,7 +489,7 @@ function renderUniformAnalysis({ title, intro, summaryHeaders, summaryValues, ta
             <tr>${summaryHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
           </thead>
           <tbody>
-            <tr>${summaryValues.map((value) => `<td>${escapeHtml(value)}</td>`).join("")}</tr>
+            <tr>${summaryValues.map((value, index) => `<td data-label="${escapeHtml(summaryHeaders[index] || "")}">${escapeHtml(value)}</td>`).join("")}</tr>
           </tbody>
         </table>
       </div>
@@ -737,11 +737,11 @@ function renderParetoAnalysis({ title, periodRows, groupLabel, itemLabel, noteTo
           </thead>
           <tbody>
             <tr>
-              <td>${escapeHtml(formatParetoMetric(totalValue, itemLabel))}</td>
-              <td>${escapeHtml(String(groupedRows.length))}</td>
-              <td>${escapeHtml(String(activeRows.length))}</td>
-              <td>${escapeHtml(formatParetoMetric(topTwoValue, itemLabel))}</td>
-              <td>${escapeHtml(`${formatDecimal(incidenceTopTwo)}%`)}</td>
+              <td data-label="${escapeHtml(itemLabel === "Lavorazione" ? "Pezzi totali" : "Valore totale")}">${escapeHtml(formatParetoMetric(totalValue, itemLabel))}</td>
+              <td data-label="${escapeHtml(itemLabel === "Lavorazione" ? "Lavorazioni a listino" : "Medici totali")}">${escapeHtml(String(groupedRows.length))}</td>
+              <td data-label="${escapeHtml(groupLabel)}">${escapeHtml(String(activeRows.length))}</td>
+              <td data-label="${escapeHtml(`Top 2 ${itemLabel.toLowerCase()}${itemLabel === "Lavorazione" ? "" : "i"}`)}">${escapeHtml(formatParetoMetric(topTwoValue, itemLabel))}</td>
+              <td data-label="Incidenza Top 2">${escapeHtml(`${formatDecimal(incidenceTopTwo)}%`)}</td>
             </tr>
           </tbody>
         </table>
@@ -805,11 +805,11 @@ function renderSlaAnalysis() {
           </thead>
           <tbody>
             <tr>
-              <td>${escapeHtml(String(grouped.length))}</td>
-              <td>${escapeHtml(String(deliveredRows.length))}</td>
-              <td>${escapeHtml(String(totalPieces))}</td>
-              <td>${escapeHtml(`${formatDecimal(avgOverall)} giorni`)}</td>
-              <td>${escapeHtml(String(flaggedRows.length))}</td>
+              <td data-label="Studi">${escapeHtml(String(grouped.length))}</td>
+              <td data-label="Lavori">${escapeHtml(String(deliveredRows.length))}</td>
+              <td data-label="Pezzi">${escapeHtml(String(totalPieces))}</td>
+              <td data-label="Tempo medio complessivo">${escapeHtml(`${formatDecimal(avgOverall)} giorni`)}</td>
+              <td data-label="Righe da verificare">${escapeHtml(String(flaggedRows.length))}</td>
             </tr>
           </tbody>
         </table>
