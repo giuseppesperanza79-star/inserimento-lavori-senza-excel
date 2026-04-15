@@ -43,7 +43,7 @@ const IMPORTED_JOBS = Array.isArray(window.DEFAULT_SPERANZA_JOBS) && window.DEFA
     }))
   : DEFAULT_JOBS;
 
-const ANALYSIS_MODES = ["Prova non rientrati","Consegnati nel periodo","SLA per studio","Distribuzione per medico","Distribuzione per lavorazione","Pareto clienti 80/20","Pareto lavorazioni 80/20","Numeri economici","Valore potenziale","Clienti piu' scontati","Lavorazioni per volume","Margine perso per lavorazione","Indicatori flusso"];
+const ANALYSIS_MODES = ["Prova non rientrati","Consegnati nel periodo","SLA per studio","Distribuzione per medico","Distribuzione per lavorazione","Pareto clienti 80/20","Pareto lavorazioni 80/20","Numeri economici","Valore potenziale","Clienti piu' scontati","Lavorazioni per volume","Margine perso per lavorazione","Saldo diretto"];
 const state = {
   jobs: [],
   activeView: "operativita",
@@ -53,6 +53,8 @@ const state = {
   analysisDetailFilterLabel: "",
   analysisDetailEmptyLabel: "Nessun dettaglio disponibile."
 };
+let activeViewedJobId = "";
+let isJobModalEditing = false;
 const viewButtons = Array.from(document.querySelectorAll(".view-tab"));
 const viewPanels = { operativita: document.getElementById("view-operativita"), analisi: document.getElementById("view-analisi") };
 const jobForm = document.getElementById("jobForm");
@@ -73,6 +75,7 @@ const jobTrialOutDateInput = document.getElementById("jobTrialOutDateInput");
 const jobTrialReturnDateInput = document.getElementById("jobTrialReturnDateInput");
 const jobUrgentInput = document.getElementById("jobUrgentInput");
 const jobRedoInput = document.getElementById("jobRedoInput");
+const jobSaldoDirettoInput = document.getElementById("jobSaldoDirettoInput");
 const jobPriceInfoInput = document.getElementById("jobPriceInfoInput");
 const jobNoteInput = document.getElementById("jobNoteInput");
 const jobListTotalValue = document.getElementById("jobListTotalValue");
@@ -104,6 +107,14 @@ const clientOptions = document.getElementById("clientOptions");
 const clientFilterOptions = document.getElementById("clientFilterOptions");
 const workTypeOptions = document.getElementById("workTypeOptions");
 const operatorOptions = document.getElementById("operatorOptions");
+const jobViewModal = document.getElementById("jobViewModal");
+const jobViewBackdrop = document.getElementById("jobViewBackdrop");
+const jobViewCloseButton = document.getElementById("jobViewCloseButton");
+const jobViewCloseSecondary = document.getElementById("jobViewCloseSecondary");
+const jobViewEditButton = document.getElementById("jobViewEditButton");
+const jobViewTitle = document.getElementById("jobViewTitle");
+const jobViewSubtitle = document.getElementById("jobViewSubtitle");
+const jobViewContent = document.getElementById("jobViewContent");
 
 const CLEAN_IMPORTED_JOBS = IMPORTED_JOBS.map(normalizeJobRecord).filter(isUsefulJobRecord);
 const CLIENT_CHOICES = getUniqueSorted(CLEAN_IMPORTED_JOBS.map((job) => job.client));
@@ -118,6 +129,7 @@ function initialize() {
   renderOperatorFilterOptions();
   wireEvents();
   resetForm();
+  initializeParentFrameReporting("lavori");
   initializeAnalysisRange();
   renderAnalysisChips();
   setActiveView("operativita");
@@ -144,6 +156,11 @@ function wireEvents() {
   [jobListPriceInput, jobAppliedPriceInput, jobQuantityInput].forEach((input) => input.addEventListener("input", updatePricePreview));
   jobTypeInput.addEventListener("change", handleWorkTypeSelection);
   jobTypeInput.addEventListener("blur", handleWorkTypeSelection);
+  jobViewBackdrop.addEventListener("click", closeJobModal);
+  jobViewCloseButton.addEventListener("click", closeJobModal);
+  jobViewCloseSecondary.addEventListener("click", handleModalSecondaryAction);
+  jobViewEditButton.addEventListener("click", handleEditFromModal);
+  document.addEventListener("keydown", handleGlobalKeydown);
 }
 
 function loadState() {
@@ -184,7 +201,7 @@ function handleSubmit(event) {
     jobCode: sanitizedCode, client: clean(jobClientInput.value), type: clean(jobTypeInput.value), operator: clean(jobOperatorInput.value),
     listPrice, appliedPrice: appliedUnitPrice, quantity, standardDays: parseInt(jobStandardDaysInput.value || "0", 10) || 0,
     entryDate: jobEntryDateInput.value, deliveryDate: jobDeliveryDateInput.value, trialOutDate: jobTrialOutDateInput.value, trialReturnDate: jobTrialReturnDateInput.value,
-    urgent: jobUrgentInput.checked, redo: jobRedoInput.checked, status: clean(jobStatusInput.value), note: clean(jobNoteInput.value), priceInfo: clean(jobPriceInfoInput.value), pieces: quantity
+    urgent: jobUrgentInput.checked, redo: jobRedoInput.checked, saldoDirect: jobSaldoDirettoInput.checked, status: clean(jobStatusInput.value), note: clean(jobNoteInput.value), priceInfo: clean(jobPriceInfoInput.value), pieces: quantity
   };
   if (!job.jobCode || !job.client || !job.type || !job.entryDate) {
     window.alert("Completa almeno ID lavoro, cliente, lavorazione e data ingresso.");
@@ -199,16 +216,22 @@ function handleSubmit(event) {
   persistState(); resetForm(); render();
 }
 function resetForm() {
-  jobForm.reset(); jobIdHidden.value = ""; jobQuantityInput.value = "1"; jobStandardDaysInput.value = "4"; jobStatusInput.value = "In lavorazione"; jobEntryDateInput.value = isoToday(); updatePricePreview();
+  jobForm.reset(); jobIdHidden.value = ""; jobQuantityInput.value = "1"; jobStandardDaysInput.value = "4"; jobStatusInput.value = "In lavorazione"; jobEntryDateInput.value = isoToday(); jobSaldoDirettoInput.checked = false; updatePricePreview();
 }
 function resetFilters() { jobSearchInput.value = ""; jobClientFilterInput.value = ""; jobOperatorFilterInput.value = ""; jobUrgencyFilter.value = ""; tableSearchInput.value = ""; render(); }
 function resetArchive() {
   if (!window.confirm("Vuoi davvero ripristinare l'archivio base dei lavori?")) return;
+  const archivePassword = window.prompt("Per confermare lo svuotamento archivio inserisci la password.");
+  if (archivePassword === null) return;
+  if (archivePassword.trim() !== "2026") {
+    window.alert("Password non corretta. Archivio non modificato.");
+    return;
+  }
   state.jobs = [...IMPORTED_JOBS]; persistState(); resetForm(); initializeAnalysisRange(); render();
 }
 function exportJson() { downloadFile("inserimento-lavori-senza-excel.json", JSON.stringify(state.jobs, null, 2), "application/json;charset=utf-8;"); }
 function exportCsv() {
-  const rows = [["id_lavoro","cliente","lavorazione","operatore","listino_unitario","prezzo_applicato_unitario","quantita","totale","stato","ingresso","consegna","uscita_prova","rientro_prova","urgente","rifacimento","info_listino","note"], ...state.jobs.map((job) => [job.jobCode, job.client, job.type, job.operator, job.listPrice, job.appliedPrice, job.quantity, computeAppliedTotal(job), job.status, job.entryDate, job.deliveryDate, job.trialOutDate, job.trialReturnDate, job.urgent ? "Si" : "No", job.redo ? "Si" : "No", job.priceInfo, job.note])];
+  const rows = [["id_lavoro","cliente","lavorazione","operatore","listino_unitario","prezzo_applicato_unitario","quantita","totale","stato","ingresso","consegna","uscita_prova","rientro_prova","urgente","rifacimento","saldo_diretto","info_listino","note"], ...state.jobs.map((job) => [job.jobCode, job.client, job.type, job.operator, job.listPrice, job.appliedPrice, job.quantity, computeAppliedTotal(job), job.status, job.entryDate, job.deliveryDate, job.trialOutDate, job.trialReturnDate, job.urgent ? "Si" : "No", job.redo ? "Si" : "No", job.saldoDirect ? "Si" : "No", job.priceInfo, job.note])];
   const csv = rows.map((row) => row.map(escapeCsv).join(";")).join("\n");
   downloadFile("inserimento-lavori-senza-excel.csv", csv, "text/csv;charset=utf-8;");
 }
@@ -280,7 +303,7 @@ function renderTable(rows) {
       <td data-label="Urgente"><span class="flag-pill ${job.urgent ? "flag-yes" : "flag-no"}">${job.urgent ? "Si" : "No"}</span></td>
       <td data-label="Rifacimento"><span class="flag-pill ${job.redo ? "flag-yes" : "flag-no"}">${job.redo ? "Si" : "No"}</span></td>
       <td data-label="Totale">${escapeHtml(formatCurrency(computeAppliedTotal(job)))}</td>
-      <td data-label="Azioni"><div class="table-actions"><button class="table-action secondary" type="button" data-action="edit" data-id="${escapeHtml(job.id)}">Modifica</button><button class="table-action danger" type="button" data-action="delete" data-id="${escapeHtml(job.id)}">Elimina</button></div></td>
+      <td data-label="Azioni"><div class="table-actions"><button class="table-action info" type="button" data-action="view" data-id="${escapeHtml(job.id)}">Visualizza</button><button class="table-action secondary" type="button" data-action="edit" data-id="${escapeHtml(job.id)}">Modifica</button><button class="table-action danger" type="button" data-action="delete" data-id="${escapeHtml(job.id)}">Elimina</button></div></td>
     </tr>`).join("") : `<tr><td colspan="10" class="empty-state">Nessun lavoro corrisponde ai filtri selezionati.</td></tr>`;
   jobTableBody.querySelectorAll("[data-action]").forEach((button) => button.addEventListener("click", handleTableAction));
 }
@@ -290,13 +313,315 @@ function handleTableAction(event) {
   const id = event.currentTarget.dataset.id;
   const job = state.jobs.find((item) => item.id === id);
   if (!job) return;
+  if (action === "view") {
+    openJobModal(job);
+    return;
+  }
   if (action === "edit") {
-    jobIdHidden.value = job.id; jobCodeInput.value = job.jobCode || ""; jobClientInput.value = job.client || ""; jobTypeInput.value = job.type || ""; jobOperatorInput.value = job.operator || ""; jobListPriceInput.value = job.listPrice || ""; jobStandardDaysInput.value = job.standardDays || ""; jobQuantityInput.value = job.quantity || 1; jobAppliedPriceInput.value = job.appliedPrice || ""; jobStatusInput.value = job.status || "In lavorazione"; jobEntryDateInput.value = job.entryDate || ""; jobDeliveryDateInput.value = job.deliveryDate || ""; jobTrialOutDateInput.value = job.trialOutDate || ""; jobTrialReturnDateInput.value = job.trialReturnDate || ""; jobUrgentInput.checked = !!job.urgent; jobRedoInput.checked = !!job.redo; jobPriceInfoInput.value = job.priceInfo || ""; jobNoteInput.value = job.note || ""; updatePricePreview(); setActiveView("operativita"); window.scrollTo({ top: 0, behavior: "smooth" }); return;
+    populateFormForEdit(job);
+    return;
   }
   if (action === "delete") {
     if (!window.confirm(`Eliminare il lavoro ${job.jobCode}?`)) return;
     state.jobs = state.jobs.filter((item) => item.id !== id); persistState(); render();
   }
+}
+
+function populateFormForEdit(job) {
+  jobIdHidden.value = job.id;
+  jobCodeInput.value = job.jobCode || "";
+  jobClientInput.value = job.client || "";
+  jobTypeInput.value = job.type || "";
+  jobOperatorInput.value = job.operator || "";
+  jobListPriceInput.value = job.listPrice || "";
+  jobStandardDaysInput.value = job.standardDays || "";
+  jobQuantityInput.value = job.quantity || 1;
+  jobAppliedPriceInput.value = job.appliedPrice || "";
+  jobStatusInput.value = job.status || "In lavorazione";
+  jobEntryDateInput.value = job.entryDate || "";
+  jobDeliveryDateInput.value = job.deliveryDate || "";
+  jobTrialOutDateInput.value = job.trialOutDate || "";
+  jobTrialReturnDateInput.value = job.trialReturnDate || "";
+  jobUrgentInput.checked = !!job.urgent;
+  jobRedoInput.checked = !!job.redo;
+  jobSaldoDirettoInput.checked = !!job.saldoDirect;
+  jobPriceInfoInput.value = job.priceInfo || "";
+  jobNoteInput.value = job.note || "";
+  updatePricePreview();
+  setActiveView("operativita");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function openJobModal(job) {
+  activeViewedJobId = job.id;
+  isJobModalEditing = false;
+  renderJobModal(job);
+  jobViewModal.hidden = false;
+  jobViewModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+}
+
+function closeJobModal() {
+  activeViewedJobId = "";
+  isJobModalEditing = false;
+  jobViewModal.hidden = true;
+  jobViewModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+}
+
+function handleEditFromModal() {
+  if (!activeViewedJobId) return;
+  const job = state.jobs.find((item) => item.id === activeViewedJobId);
+  if (!job) return;
+  if (!isJobModalEditing) {
+    isJobModalEditing = true;
+    renderJobModal(job);
+    return;
+  }
+  saveJobFromModal(job);
+}
+
+function handleGlobalKeydown(event) {
+  if (event.key === "Escape" && !jobViewModal.hidden) {
+    if (isJobModalEditing) {
+      handleModalSecondaryAction();
+      return;
+    }
+    closeJobModal();
+  }
+}
+
+function handleModalSecondaryAction() {
+  if (!activeViewedJobId) {
+    closeJobModal();
+    return;
+  }
+  if (!isJobModalEditing) {
+    closeJobModal();
+    return;
+  }
+  const job = state.jobs.find((item) => item.id === activeViewedJobId);
+  if (!job) {
+    closeJobModal();
+    return;
+  }
+  isJobModalEditing = false;
+  renderJobModal(job);
+}
+
+function buildJobModalMarkup(job) {
+  const pieces = Number(job.pieces || job.quantity || 1);
+  const listUnit = parseNumber(job.listPrice);
+  const appliedUnit = parseNumber(job.appliedPrice);
+  const listTotal = computeListTotal(job);
+  const appliedTotal = computeAppliedTotal(job);
+  const fields = [
+    ["ID lavoro", job.jobCode],
+    ["Cliente", job.client],
+    ["Lavorazione", job.type],
+    ["Operatore", job.operator || "-"],
+    ["Stato lavoro", job.status || "-"],
+    ["Quantita'", formatInteger(job.quantity || 1)],
+    ["Pezzi", formatInteger(pieces)],
+    ["Urgente", job.urgent ? "Si" : "No"],
+    ["Rifacimento", job.redo ? "Si" : "No"],
+    ["Saldo diretto", job.saldoDirect ? "Si" : "No"],
+    ["Ingresso", formatDate(job.entryDate)],
+    ["Consegna", formatDate(job.deliveryDate)],
+    ["Uscita prova", formatDate(job.trialOutDate)],
+    ["Rientro prova", formatDate(job.trialReturnDate)],
+    ["Tempo standard", `${formatInteger(job.standardDays || 0)} giorni`],
+    ["Listino unitario", formatCurrency(listUnit)],
+    ["Applicato unitario", formatCurrency(appliedUnit)],
+    ["Totale listino", formatCurrency(listTotal)],
+    ["Totale applicato", formatCurrency(appliedTotal)],
+    ["Info listino", job.priceInfo || "-"],
+    ["Note", job.note || "-"]
+  ];
+
+  return `
+    <div class="job-modal-grid">
+      ${fields.map(([label, value]) => `
+        <article class="job-modal-card">
+          <span class="job-modal-label">${escapeHtml(label)}</span>
+          <strong class="job-modal-value">${escapeHtml(String(value ?? "-"))}</strong>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderJobModal(job) {
+  jobViewTitle.textContent = `${job.jobCode || "Lavoro"} - ${job.client || "Cliente"}`;
+  if (isJobModalEditing) {
+    jobViewSubtitle.textContent = "Modifica la scheda direttamente qui e salva senza tornare alla compilazione.";
+    jobViewContent.innerHTML = buildJobModalEditMarkup(job);
+    jobViewEditButton.textContent = "Salva modifiche";
+    jobViewCloseSecondary.textContent = "Annulla modifica";
+    wireJobModalEditEvents();
+    updateJobModalPricePreview();
+    return;
+  }
+  jobViewSubtitle.textContent = job.type ? `Scheda completa della lavorazione ${job.type}.` : "Scheda completa in sola lettura.";
+  jobViewContent.innerHTML = buildJobModalMarkup(job);
+  jobViewEditButton.textContent = "Modifica questo lavoro";
+  jobViewCloseSecondary.textContent = "Chiudi";
+}
+
+function buildJobModalEditMarkup(job) {
+  return `
+    <div class="job-modal-content-block">
+      <p class="job-modal-hint">Puoi aggiornare i campi qui sotto e salvare direttamente dal popup, senza tornare alla compilazione principale.</p>
+    </div>
+    <div class="job-modal-edit-grid">
+      <label><span>ID lavoro</span><input id="jobModalCodeInput" type="text" inputmode="numeric" maxlength="8" value="${escapeHtml(job.jobCode || "")}" required></label>
+      <label><span>Cliente</span><input id="jobModalClientInput" type="text" list="clientOptions" value="${escapeHtml(job.client || "")}" required></label>
+      <label><span>Lavorazione</span><input id="jobModalTypeInput" type="text" list="workTypeOptions" value="${escapeHtml(job.type || "")}" required></label>
+      <label><span>Operatore</span><input id="jobModalOperatorInput" type="text" list="operatorOptions" value="${escapeHtml(job.operator || "")}"></label>
+      <label><span>Prezzo listino automatico (EUR)</span><input id="jobModalListPriceInput" type="text" value="${escapeHtml(String(job.listPrice || ""))}" readonly></label>
+      <label><span>Tempo standard (giorni)</span><input id="jobModalStandardDaysInput" type="number" min="0" step="1" value="${escapeHtml(String(job.standardDays || 0))}"></label>
+      <label><span>Quantita'</span><input id="jobModalQuantityInput" type="number" min="1" step="1" value="${escapeHtml(String(job.quantity || 1))}"></label>
+      <label><span>Prezzo manuale applicato (EUR)</span><input id="jobModalAppliedPriceInput" type="text" inputmode="decimal" value="${escapeHtml(String(job.appliedPrice || ""))}" placeholder="Se diverso dal listino"></label>
+      <label><span>Prezzo finale</span><input id="jobModalFinalPricePreview" type="text" value="" disabled></label>
+      <label>
+        <span>Stato lavoro</span>
+        <select id="jobModalStatusInput">
+          ${["In lavorazione","In prova","Consegnato","Pronto","Sospeso"].map((status) => `<option value="${escapeHtml(status)}"${status === (job.status || "In lavorazione") ? " selected" : ""}>${escapeHtml(status)}</option>`).join("")}
+        </select>
+      </label>
+      <label><span>Data ingresso</span><input id="jobModalEntryDateInput" type="date" value="${escapeHtml(job.entryDate || "")}" required></label>
+      <label><span>Data consegna</span><input id="jobModalDeliveryDateInput" type="date" value="${escapeHtml(job.deliveryDate || "")}"></label>
+      <label><span>Data uscita prova</span><input id="jobModalTrialOutDateInput" type="date" value="${escapeHtml(job.trialOutDate || "")}"></label>
+      <label><span>Data rientro prova</span><input id="jobModalTrialReturnDateInput" type="date" value="${escapeHtml(job.trialReturnDate || "")}"></label>
+      <label class="checkbox-field"><input id="jobModalUrgentInput" type="checkbox"${job.urgent ? " checked" : ""}><span>Urgente</span></label>
+      <label class="checkbox-field"><input id="jobModalRedoInput" type="checkbox"${job.redo ? " checked" : ""}><span>Rifacimento</span></label>
+      <label class="checkbox-field"><input id="jobModalSaldoDirettoInput" type="checkbox"${job.saldoDirect ? " checked" : ""}><span>Saldo diretto</span></label>
+      <label class="full-width"><span>Info listino</span><input id="jobModalPriceInfoInput" type="text" value="${escapeHtml(job.priceInfo || "")}" placeholder="Lavorazione libera o non presente nel listino"></label>
+      <div class="totals-grid full-width">
+        <article class="mini-total">
+          <span>Totale listino</span>
+          <strong id="jobModalListTotalValue">0,00 EUR</strong>
+        </article>
+        <article class="mini-total alert">
+          <span>Totale applicato</span>
+          <strong id="jobModalAppliedTotalValue">EUR 0,00</strong>
+        </article>
+      </div>
+      <label class="full-width"><span>Note</span><textarea id="jobModalNoteInput" rows="4" placeholder="Annotazioni sul lavoro">${escapeHtml(job.note || "")}</textarea></label>
+    </div>
+  `;
+}
+
+function wireJobModalEditEvents() {
+  const modalTypeInput = document.getElementById("jobModalTypeInput");
+  const modalAppliedPriceInput = document.getElementById("jobModalAppliedPriceInput");
+  const modalQuantityInput = document.getElementById("jobModalQuantityInput");
+  [modalAppliedPriceInput, modalQuantityInput].forEach((input) => input && input.addEventListener("input", updateJobModalPricePreview));
+  if (modalTypeInput) {
+    modalTypeInput.addEventListener("change", handleJobModalWorkTypeSelection);
+    modalTypeInput.addEventListener("blur", handleJobModalWorkTypeSelection);
+  }
+}
+
+function handleJobModalWorkTypeSelection() {
+  const modalTypeInput = document.getElementById("jobModalTypeInput");
+  const modalListPriceInput = document.getElementById("jobModalListPriceInput");
+  const modalStandardDaysInput = document.getElementById("jobModalStandardDaysInput");
+  const modalPriceInfoInput = document.getElementById("jobModalPriceInfoInput");
+  if (!modalTypeInput || !modalListPriceInput || !modalStandardDaysInput || !modalPriceInfoInput) return;
+  const key = normalizeText(modalTypeInput.value);
+  if (!key || !WORK_TYPE_META.has(key)) return;
+  const meta = WORK_TYPE_META.get(key);
+  modalListPriceInput.value = meta.listPrice ? String(meta.listPrice).replace(".", ",") : "";
+  modalStandardDaysInput.value = meta.standardDays ? String(meta.standardDays) : "4";
+  if (!modalPriceInfoInput.value && meta.priceInfo) {
+    modalPriceInfoInput.value = meta.priceInfo;
+  }
+  updateJobModalPricePreview();
+}
+
+function updateJobModalPricePreview() {
+  const modalListPriceInput = document.getElementById("jobModalListPriceInput");
+  const modalAppliedPriceInput = document.getElementById("jobModalAppliedPriceInput");
+  const modalQuantityInput = document.getElementById("jobModalQuantityInput");
+  const modalFinalPricePreview = document.getElementById("jobModalFinalPricePreview");
+  const modalListTotalValue = document.getElementById("jobModalListTotalValue");
+  const modalAppliedTotalValue = document.getElementById("jobModalAppliedTotalValue");
+  if (!modalListPriceInput || !modalQuantityInput || !modalFinalPricePreview || !modalListTotalValue || !modalAppliedTotalValue) return;
+  const quantity = Math.max(parseInt(modalQuantityInput.value || "1", 10) || 1, 1);
+  const listPrice = parseNumber(modalListPriceInput.value);
+  const applied = modalAppliedPriceInput && modalAppliedPriceInput.value ? parseNumber(modalAppliedPriceInput.value) : listPrice;
+  const listTotal = listPrice * quantity;
+  const appliedTotal = applied * quantity;
+  modalFinalPricePreview.value = appliedTotal ? formatCurrency(appliedTotal) : "Calcolato automaticamente";
+  modalListTotalValue.textContent = formatCurrency(listTotal);
+  modalAppliedTotalValue.textContent = `EUR ${formatDecimal(appliedTotal)}`;
+}
+
+function saveJobFromModal(job) {
+  const modalCodeInput = document.getElementById("jobModalCodeInput");
+  const modalClientInput = document.getElementById("jobModalClientInput");
+  const modalTypeInput = document.getElementById("jobModalTypeInput");
+  const modalOperatorInput = document.getElementById("jobModalOperatorInput");
+  const modalListPriceInput = document.getElementById("jobModalListPriceInput");
+  const modalStandardDaysInput = document.getElementById("jobModalStandardDaysInput");
+  const modalQuantityInput = document.getElementById("jobModalQuantityInput");
+  const modalAppliedPriceInput = document.getElementById("jobModalAppliedPriceInput");
+  const modalStatusInput = document.getElementById("jobModalStatusInput");
+  const modalEntryDateInput = document.getElementById("jobModalEntryDateInput");
+  const modalDeliveryDateInput = document.getElementById("jobModalDeliveryDateInput");
+  const modalTrialOutDateInput = document.getElementById("jobModalTrialOutDateInput");
+  const modalTrialReturnDateInput = document.getElementById("jobModalTrialReturnDateInput");
+  const modalUrgentInput = document.getElementById("jobModalUrgentInput");
+  const modalRedoInput = document.getElementById("jobModalRedoInput");
+  const modalSaldoDirettoInput = document.getElementById("jobModalSaldoDirettoInput");
+  const modalPriceInfoInput = document.getElementById("jobModalPriceInfoInput");
+  const modalNoteInput = document.getElementById("jobModalNoteInput");
+  if (!modalCodeInput || !modalClientInput || !modalTypeInput || !modalEntryDateInput) return;
+
+  const sanitizedCode = clean(modalCodeInput.value).replace(/\D/g, "").slice(0, 8);
+  modalCodeInput.value = sanitizedCode;
+  const quantity = Math.max(parseInt(modalQuantityInput?.value || "1", 10) || 1, 1);
+  const listPrice = parseNumber(modalListPriceInput?.value || 0);
+  const appliedUnitPrice = modalAppliedPriceInput?.value ? parseNumber(modalAppliedPriceInput.value) : listPrice;
+  const updatedJob = {
+    ...job,
+    jobCode: sanitizedCode,
+    client: clean(modalClientInput.value),
+    type: clean(modalTypeInput.value),
+    operator: clean(modalOperatorInput?.value),
+    listPrice,
+    appliedPrice: appliedUnitPrice,
+    quantity,
+    standardDays: parseInt(modalStandardDaysInput?.value || "0", 10) || 0,
+    entryDate: modalEntryDateInput.value,
+    deliveryDate: modalDeliveryDateInput?.value || "",
+    trialOutDate: modalTrialOutDateInput?.value || "",
+    trialReturnDate: modalTrialReturnDateInput?.value || "",
+    urgent: !!modalUrgentInput?.checked,
+    redo: !!modalRedoInput?.checked,
+    saldoDirect: !!modalSaldoDirettoInput?.checked,
+    status: clean(modalStatusInput?.value),
+    note: clean(modalNoteInput?.value),
+    priceInfo: clean(modalPriceInfoInput?.value),
+    pieces: quantity
+  };
+
+  if (!updatedJob.jobCode || !updatedJob.client || !updatedJob.type || !updatedJob.entryDate) {
+    window.alert("Completa almeno ID lavoro, cliente, lavorazione e data ingresso.");
+    return;
+  }
+  if (!/^\d{1,8}$/.test(updatedJob.jobCode)) {
+    window.alert("L'ID lavoro deve contenere solo numeri e massimo 8 cifre.");
+    return;
+  }
+  const index = state.jobs.findIndex((item) => item.id === updatedJob.id);
+  if (index < 0) return;
+  state.jobs.splice(index, 1, updatedJob);
+  persistState();
+  render();
+  isJobModalEditing = false;
+  renderJobModal(updatedJob);
 }
 
 function renderAnalysisChips() {
@@ -458,22 +783,17 @@ function renderAnalysisMode(rows) {
     });
     return;
   } else {
-    const metrics = [
-      ["Tempo medio standard", `${formatDecimal(average(rows.map((job) => job.standardDays || 0)))} gg`, "Media dei giorni standard impostati sulle lavorazioni"],
-      ["Lavori in prova", String(rows.filter((job) => normalizeText(job.status) === "in prova").length), "Lavori attualmente in stato In prova"],
-      ["Consegne registrate", String(rows.filter((job) => job.deliveryDate).length), "Lavori con data consegna compilata"],
-      ["Urgenze", String(rows.filter((job) => job.urgent).length), "Lavori marcati come urgenti"],
-      ["Rifacimenti", String(rows.filter((job) => job.redo).length), "Lavori marcati come rifacimento"]
-    ];
+    const saldoRows = rows.filter((job) => !!job.saldoDirect);
+    const grouped = summarizeGroupMetrics(saldoRows, (job) => job.client, (job) => computeAppliedTotal(job));
     renderUniformAnalysis({
-      title: "Indicatori di flusso",
-      intro: "Lettura sintetica dei principali indicatori di avanzamento e carico del laboratorio.",
-      summaryHeaders: ["Lavori", "Pezzi", "Valore", "In prova", "Consegnati"],
-      summaryValues: [String(rows.length), formatInteger(sumPieces(rows)), formatCurrency(sumApplied(rows)), String(rows.filter((job) => normalizeText(job.status) === "in prova").length), String(rows.filter((job) => job.deliveryDate).length)],
-      tableHeaders: ["Indicatore", "Valore", "Nota"],
-      tableRows: metrics,
-      detailRecords: rows.map((job) => buildJobDetailRecord(job, job.status || "stato", [`Ingresso ${formatDate(job.entryDate)}`, `Stato ${job.status || "-"}`])),
-      detailEmptyLabel: "Nessun dettaglio di flusso disponibile."
+      title: "Saldo diretto",
+      intro: "Lavori marcati come saldo diretto, utili per controllare pezzi, valore e studi coinvolti fuori dal ciclo ordinario.",
+      summaryHeaders: ["Studi", "Lavori", "Pezzi", "Valore saldo diretto", "Ticket medio"],
+      summaryValues: [String(grouped.length), String(saldoRows.length), formatInteger(sumPieces(saldoRows)), formatCurrency(sumApplied(saldoRows)), formatCurrency(saldoRows.length ? sumApplied(saldoRows) / saldoRows.length : 0)],
+      tableHeaders: ["Studio", "Lavori", "Pezzi", "Valore", "Ultimo ingresso"],
+      tableRows: grouped.map((item) => ({ cells: [item.label, formatInteger(item.jobs), formatInteger(item.pieces), formatCurrency(item.value), formatDate(item.latestDate)], detailKey: item.label })),
+      detailRecords: saldoRows.map((job) => buildJobDetailRecord(job, job.client, [`Saldo diretto`, `Stato ${job.status || "-"}`, `Ingresso ${formatDate(job.entryDate)}`])),
+      detailEmptyLabel: "Nessun lavoro marcato come saldo diretto nel periodo selezionato."
     });
     return;
   }
@@ -609,7 +929,8 @@ function normalizeJobRecord(job) {
     operator: normalizeImportedText(job.operator),
     note: normalizeImportedText(job.note),
     priceInfo: normalizeImportedText(job.priceInfo),
-    status: normalizeImportedText(job.status) || "In lavorazione"
+    status: normalizeImportedText(job.status) || "In lavorazione",
+    saldoDirect: !!job.saldoDirect
   };
 }
 function isUsefulJobRecord(job) {
@@ -1053,6 +1374,7 @@ function matchesQuickFilter(job, filterKey, haystack) {
   if (filterKey === "da rientrare") return !!job.trialOutDate && !job.trialReturnDate;
   if (filterKey === "consegnato" || filterKey === "consegnate") return isDelivered;
   if (filterKey === "pronto") return isReady;
+  if (filterKey === "sospeso" || filterKey === "sospese") return isSuspended;
   if (filterKey === "urgenti") return !!job.urgent;
   if (filterKey === "rifacimenti") return !!job.redo;
 
@@ -1062,3 +1384,33 @@ function matchesQuickFilter(job, filterKey, haystack) {
 jobCodeInput.addEventListener("input", () => {
   jobCodeInput.value = clean(jobCodeInput.value).replace(/\D/g, "").slice(0, 8);
 });
+
+function initializeParentFrameReporting(frameName) {
+  if (window.top === window.self) {
+    return;
+  }
+
+  const reportHeight = () => {
+    const height = Math.max(
+      document.body.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.scrollHeight,
+      document.documentElement.offsetHeight
+    );
+
+    window.parent.postMessage({ type: "dentalg:frameHeight", frameName, height }, "*");
+  };
+
+  const scheduleReport = () => {
+    reportHeight();
+    [120, 320, 700, 1400].forEach((delay) => window.setTimeout(reportHeight, delay));
+  };
+
+  window.addEventListener("load", scheduleReport);
+  window.addEventListener("resize", scheduleReport);
+
+  const observer = new MutationObserver(scheduleReport);
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true });
+
+  scheduleReport();
+}

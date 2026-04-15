@@ -10,9 +10,18 @@
   <div class="app-shell">
     <header class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Gestionale locale</p>
-        <h1>Inserimento lavori senza Excel</h1>
-        <p class="subtitle">Compila i campi da browser, salva in locale e genera esportazioni rapide in CSV o JSON.</p>
+        <div class="hero-brand">
+          <img class="hero-logo" src="./assets/logo_dentalg.jpg" alt="Logo Dental G">
+          <div class="hero-brand-copy">
+            <p class="eyebrow">Dental G Software</p>
+            <p class="hero-kicker">Modulo operativo</p>
+          </div>
+        </div>
+        <h1 class="hero-title">
+          <span class="hero-title-line">Inserimento</span>
+          <span class="hero-title-line hero-title-accent">lavori</span>
+          <span class="hero-title-line">senza Excel</span>
+        </h1>
       </div>
       <div class="hero-actions">
         <button id="exportCsvButton" class="secondary" type="button">Esporta CSV</button>
@@ -64,6 +73,7 @@
 
               <label class="checkbox-field"><input id="jobUrgentInput" type="checkbox"><span>Urgente</span></label>
               <label class="checkbox-field"><input id="jobRedoInput" type="checkbox"><span>Rifacimento</span></label>
+              <label class="checkbox-field"><input id="jobSaldoDirettoInput" type="checkbox"><span>Saldo diretto</span></label>
 
               <label class="full-width"><span>Info listino</span><input id="jobPriceInfoInput" type="text" placeholder="Lavorazione libera o non presente nel listino"></label>
 
@@ -99,16 +109,18 @@
             </div>
 
             <div class="stack-list">
-              <label>
-                <span>Ricerca commesse</span>
-                <small>Filtro commesse</small>
+                <label>
+                  <span>Ricerca commesse</span>
+                  <small>Filtro commesse</small>
                 <select id="jobSearchInput">
                   <option value="">Tutte le commesse</option>
                   <option value="aperte">Aperte</option>
                   <option value="in lavorazione">In lavorazione</option>
                   <option value="in prova">In prova</option>
                   <option value="da rientrare">Da rientrare</option>
+                  <option value="pronto">Pronto</option>
                   <option value="consegnato">Consegnate</option>
+                  <option value="sospeso">Sospese</option>
                   <option value="urgenti">Urgenti</option>
                   <option value="rifacimenti">Rifacimenti</option>
                 </select>
@@ -225,6 +237,23 @@
           </section>
         </section>
     </main>
+  </div>
+
+  <div id="jobViewModal" class="job-modal" hidden aria-hidden="true">
+    <div id="jobViewBackdrop" class="job-modal-backdrop"></div>
+    <div class="job-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="jobViewTitle">
+      <button id="jobViewCloseButton" class="job-modal-close" type="button" aria-label="Chiudi dettaglio lavoro">×</button>
+      <div class="job-modal-head">
+        <p class="section-label">Dettaglio lavoro</p>
+        <h2 id="jobViewTitle">Visualizza lavoro</h2>
+        <p id="jobViewSubtitle" class="subtitle compact">Scheda completa in sola lettura.</p>
+      </div>
+      <div id="jobViewContent" class="job-modal-content"></div>
+      <div class="job-modal-actions">
+        <button id="jobViewEditButton" type="button">Modifica questo lavoro</button>
+        <button id="jobViewCloseSecondary" class="secondary" type="button">Chiudi</button>
+      </div>
+    </div>
   </div>
 
   <script src="./seed-jobs.js"></script>
