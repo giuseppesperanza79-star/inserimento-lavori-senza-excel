@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="google-maps-api-key" content="">
   <title>Inserimento lavori senza Excel</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -11,7 +12,7 @@
     <header class="hero">
       <div class="hero-copy">
         <div class="hero-brand">
-          <img class="hero-logo" src="./logo_dentalg.jpg" alt="Logo Dental G">
+          <img class="hero-logo" src="./assets/logo_dentalg.jpg" alt="Logo Dental G">
           <div class="hero-brand-copy">
             <p class="eyebrow">Dental G Software</p>
             <p class="hero-kicker">Modulo operativo</p>
@@ -33,6 +34,7 @@
     <section class="view-switch" role="tablist" aria-label="Sezioni applicazione">
       <button class="view-tab active" data-view="operativita" type="button">Operativita'</button>
       <button class="view-tab" data-view="analisi" type="button">Analisi</button>
+      <button class="view-tab" data-view="consegne" type="button">Prepara giro di consegna</button>
     </section>
 
     <main>
@@ -74,6 +76,7 @@
               <label class="checkbox-field"><input id="jobUrgentInput" type="checkbox"><span>Urgente</span></label>
               <label class="checkbox-field"><input id="jobRedoInput" type="checkbox"><span>Rifacimento</span></label>
               <label class="checkbox-field"><input id="jobSaldoDirettoInput" type="checkbox"><span>Saldo diretto</span></label>
+              <label class="checkbox-field"><input id="jobPickupInput" type="checkbox"><span>Da ritirare / ingresso</span></label>
 
               <label class="full-width"><span>Info listino</span><input id="jobPriceInfoInput" type="text" placeholder="Lavorazione libera o non presente nel listino"></label>
 
@@ -192,6 +195,7 @@
         <section class="view-switch view-switch-repeat" role="tablist" aria-label="Cambio vista rapido fondo operativita">
           <button class="view-tab active" data-view="operativita" type="button">Operativita'</button>
           <button class="view-tab" data-view="analisi" type="button">Analisi</button>
+          <button class="view-tab" data-view="consegne" type="button">Prepara giro di consegna</button>
         </section>
       </section>
 
@@ -234,15 +238,152 @@
           <section class="view-switch view-switch-repeat" role="tablist" aria-label="Cambio vista rapido fondo analisi">
             <button class="view-tab" data-view="operativita" type="button">Operativita'</button>
             <button class="view-tab active" data-view="analisi" type="button">Analisi</button>
+            <button class="view-tab" data-view="consegne" type="button">Prepara giro di consegna</button>
           </section>
         </section>
+
+      <section id="view-consegne" class="app-view">
+        <section class="panel analysis-header">
+          <div class="panel-heading">
+            <p class="section-label">Logistica esterna</p>
+            <h2>Prepara giro di consegna</h2>
+            <p class="subtitle compact">Una sola tappa per studio: i lavori <strong>Pronto</strong> entrano come consegna, i lavori <strong>In prova</strong> come ritiro prova e quelli marcati <strong>Da ritirare / ingresso</strong> entrano come presa in carico dal cliente.</p>
+          </div>
+
+          <div id="deliveryKpiGrid" class="kpi-grid"></div>
+        </section>
+
+        <section class="workspace-grid delivery-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <p class="section-label">Percorso</p>
+              <h2>Giro ottimizzato per studio</h2>
+            </div>
+
+            <div class="delivery-toolbar">
+              <label class="full-width">
+                <span>Punto di partenza fattorino</span>
+                <input id="deliveryOriginInput" type="text" placeholder="Es. Sede Dental G, via ...">
+              </label>
+              <label class="delivery-action-filter">
+                <span>Filtro azione</span>
+                <select id="deliveryActionFilterInput">
+                  <option value="all">Tutte le azioni</option>
+                  <option value="delivery">Solo consegne</option>
+                  <option value="trial">Solo ritiri prova</option>
+                  <option value="pickup">Solo ritiri / ingressi</option>
+                  <option value="manual">Solo commissioni manuali</option>
+                </select>
+              </label>
+              <div class="filter-actions">
+                <button id="selectAllDeliveryButton" class="secondary" type="button">Seleziona tutte</button>
+                <button id="clearSelectionDeliveryButton" class="secondary" type="button">Deseleziona tutte</button>
+                <button id="confirmDeliveryPlanButton" type="button">Conferma lista giro</button>
+                <button id="printDeliveryPlanButton" class="secondary" type="button">Stampa giro</button>
+                <button id="openDeliveryRouteButton" type="button">Apri giro in Google Maps</button>
+              </div>
+              <p id="deliveryHint" class="hint-line">Seleziona i lavori da includere nel giro, controlla l'elenco operativo per studio e poi apri il percorso su Google Maps.</p>
+            </div>
+
+            <div id="deliveryRoutePreview" class="delivery-route-preview"></div>
+            <div id="deliverySelectionSummary" class="delivery-selection-summary"></div>
+            <div id="deliveryConfirmedSummary" class="delivery-confirmed-summary"></div>
+            <div id="deliveryGroupedList" class="delivery-grouped-list"></div>
+          </article>
+
+          <aside class="panel">
+            <section class="delivery-manual-section">
+              <div class="panel-heading delivery-manual-heading">
+                <p class="section-label">Commissioni</p>
+                <h2>Attivita' manuali del giro</h2>
+                <p class="subtitle compact">Aggiungi commissioni extra come bollette, buste, commercialista o ritiri non collegati a un lavoro. Entrano nello stesso percorso del fattorino.</p>
+              </div>
+
+              <form id="manualTaskForm" class="entry-form delivery-manual-form">
+                <input id="manualTaskIdHidden" type="hidden">
+                <label><span>Titolo attivita'</span><input id="manualTaskTitleInput" type="text" placeholder="Es. Consegna busta, pagare bolletta" required></label>
+                <label><span>Destinatario / luogo</span><input id="manualTaskClientInput" type="text" placeholder="Es. Commercialista Rossi, Enel, Studio Verdi" required></label>
+                <div class="delivery-manual-timing">
+                  <label><span>Data commissione</span><input id="manualTaskCreatedDateInput" type="date"></label>
+                  <label><span>Fascia oraria</span><input id="manualTaskTimeSlotInput" type="text" list="manualTaskTimeSlotOptions" placeholder="Es. 12:00-13:00, dopo le 15"></label>
+                </div>
+                <datalist id="manualTaskTimeSlotOptions">
+                  <option value="08:00-09:00"></option>
+                  <option value="09:00-10:00"></option>
+                  <option value="10:00-11:00"></option>
+                  <option value="11:00-12:00"></option>
+                  <option value="12:00-13:00"></option>
+                  <option value="13:00-14:00"></option>
+                  <option value="14:00-15:00"></option>
+                  <option value="15:00-16:00"></option>
+                  <option value="16:00-17:00"></option>
+                  <option value="17:00-18:00"></option>
+                  <option value="Dopo le 15"></option>
+                  <option value="Entro le 12"></option>
+                  <option value="Appena possibile"></option>
+                </datalist>
+                <label class="full-width"><span>Indirizzo</span><input id="manualTaskAddressInput" type="text" placeholder="Via, numero civico, citta'"></label>
+                <p id="manualTaskAddressHint" class="hint-line full-width">Suggerimento indirizzo non attivo.</p>
+                <label><span>Citta'</span><input id="manualTaskCityInput" type="text" placeholder="Es. Messina"></label>
+                <label><span>Provincia</span><input id="manualTaskProvinceInput" type="text" maxlength="2" placeholder="ME"></label>
+                <label>
+                  <span>Tipo commissione</span>
+                  <select id="manualTaskKindInput">
+                    <option value="Commissione">Commissione</option>
+                    <option value="Consegna documenti">Consegna documenti</option>
+                    <option value="Ritiro materiale">Ritiro materiale</option>
+                    <option value="Pagamento">Pagamento</option>
+                    <option value="Consegna busta">Consegna busta</option>
+                    <option value="Commercialista">Commercialista</option>
+                    <option value="Altro">Altro</option>
+                  </select>
+                </label>
+                <label class="checkbox-field"><input id="manualTaskUrgentInput" type="checkbox"><span>Urgente</span></label>
+                <label class="full-width"><span>Note operative</span><textarea id="manualTaskNoteInput" rows="3" placeholder="Citofono, piano, persona da cercare, documento da portare..."></textarea></label>
+                <div class="form-actions full-width">
+                  <button type="submit">Salva commissione</button>
+                  <button id="manualTaskCancelButton" class="secondary" type="button">Annulla modifica</button>
+                </div>
+              </form>
+
+              <div id="manualTaskList" class="delivery-manual-list"></div>
+            </section>
+
+            <div class="panel-heading">
+              <p class="section-label">Rubrica</p>
+              <h2>Medici e indirizzi</h2>
+              <p class="subtitle compact">Controlla l'anagrafica logistica degli studi, cerca un medico e apri il popup per aggiornare indirizzo, citta' e note operative.</p>
+            </div>
+
+            <div class="delivery-toolbar delivery-book-toolbar">
+              <div class="delivery-book-actions">
+                <button id="addAddressRecordButton" type="button">Aggiungi medico</button>
+              </div>
+              <label class="full-width">
+                <span>Cerca medico o studio</span>
+                <input id="deliveryAddressSearchInput" type="search" placeholder="Es. Famulari, Cafiero, Villa Dante...">
+              </label>
+              <p class="hint-line">L'indirizzo aggiornato viene usato per ordinare meglio le tappe del giro e per aprire il percorso su Google Maps.</p>
+            </div>
+
+            <div id="deliveryAddressBookList" class="delivery-address-book"></div>
+          </aside>
+
+          </section>
+
+        <section class="view-switch view-switch-repeat" role="tablist" aria-label="Cambio vista rapido fondo consegne">
+          <button class="view-tab" data-view="operativita" type="button">Operativita'</button>
+          <button class="view-tab" data-view="analisi" type="button">Analisi</button>
+          <button class="view-tab active" data-view="consegne" type="button">Prepara giro di consegna</button>
+        </section>
+      </section>
     </main>
   </div>
 
   <div id="jobViewModal" class="job-modal" hidden aria-hidden="true">
     <div id="jobViewBackdrop" class="job-modal-backdrop"></div>
     <div class="job-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="jobViewTitle">
-      <button id="jobViewCloseButton" class="job-modal-close" type="button" aria-label="Chiudi dettaglio lavoro">×</button>
+      <button id="jobViewCloseButton" class="job-modal-close" type="button" aria-label="Chiudi dettaglio lavoro">&times;</button>
       <div class="job-modal-head">
         <p class="section-label">Dettaglio lavoro</p>
         <h2 id="jobViewTitle">Visualizza lavoro</h2>
@@ -253,6 +394,71 @@
         <button id="jobViewEditButton" type="button">Modifica questo lavoro</button>
         <button id="jobViewCloseSecondary" class="secondary" type="button">Chiudi</button>
       </div>
+    </div>
+  </div>
+
+  <div id="addressModal" class="job-modal" hidden aria-hidden="true">
+    <div id="addressModalBackdrop" class="job-modal-backdrop"></div>
+    <div class="job-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="addressModalTitle">
+      <button id="addressModalCloseButton" class="job-modal-close" type="button" aria-label="Chiudi modifica indirizzo">&times;</button>
+      <div class="job-modal-head">
+        <p class="section-label">Rubrica consegne</p>
+        <h2 id="addressModalTitle">Modifica indirizzo studio</h2>
+        <p class="subtitle compact">Aggiorna l'anagrafica logistica da usare nel giro consegne.</p>
+      </div>
+      <form id="addressForm" class="entry-form">
+        <label class="full-width"><span>Studio</span><input id="addressClientInput" type="text"></label>
+        <label class="full-width"><span>Indirizzo</span><input id="addressStreetInput" type="text" placeholder="Via, numero civico, citta'"></label>
+        <label><span>Citta'</span><input id="addressCityInput" type="text" placeholder="Es. Messina"></label>
+        <label><span>Provincia</span><input id="addressProvinceInput" type="text" maxlength="2" placeholder="ME"></label>
+        <label class="full-width"><span>Note</span><textarea id="addressNotesInput" rows="3" placeholder="Note interne sulla consegna o verifica indirizzo"></textarea></label>
+        <div class="form-actions full-width">
+          <button id="addressModalSaveButton" type="submit">Salva indirizzo</button>
+          <button id="addressModalCancelButton" class="secondary" type="button">Annulla</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="manualTaskModal" class="job-modal" hidden aria-hidden="true">
+    <div id="manualTaskModalBackdrop" class="job-modal-backdrop"></div>
+    <div class="job-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="manualTaskModalTitle">
+      <button id="manualTaskModalCloseButton" class="job-modal-close" type="button" aria-label="Chiudi modifica commissione">&times;</button>
+      <div class="job-modal-head">
+        <p class="section-label">Commissioni</p>
+        <h2 id="manualTaskModalTitle">Modifica attivita' manuale</h2>
+        <p class="subtitle compact">Aggiorna qui la commissione e salva direttamente dal popup.</p>
+      </div>
+      <form id="manualTaskModalForm" class="entry-form">
+        <input id="manualTaskModalIdHidden" type="hidden">
+        <label><span>Titolo attivita'</span><input id="manualTaskModalTitleInput" type="text" placeholder="Es. Consegna busta, pagare bolletta" required></label>
+        <label><span>Destinatario / luogo</span><input id="manualTaskModalClientInput" type="text" placeholder="Es. Commercialista Rossi, Enel, Studio Verdi" required></label>
+        <div class="delivery-manual-timing">
+          <label><span>Data commissione</span><input id="manualTaskModalCreatedDateInput" type="date"></label>
+          <label><span>Fascia oraria</span><input id="manualTaskModalTimeSlotInput" type="text" list="manualTaskTimeSlotOptions" placeholder="Es. 12:00-13:00, dopo le 15"></label>
+        </div>
+        <label class="full-width"><span>Indirizzo</span><input id="manualTaskModalAddressInput" type="text" placeholder="Via, numero civico, citta'"></label>
+        <label><span>Citta'</span><input id="manualTaskModalCityInput" type="text" placeholder="Es. Messina"></label>
+        <label><span>Provincia</span><input id="manualTaskModalProvinceInput" type="text" maxlength="2" placeholder="ME"></label>
+        <label>
+          <span>Tipo commissione</span>
+          <select id="manualTaskModalKindInput">
+            <option value="Commissione">Commissione</option>
+            <option value="Consegna documenti">Consegna documenti</option>
+            <option value="Ritiro materiale">Ritiro materiale</option>
+            <option value="Pagamento">Pagamento</option>
+            <option value="Consegna busta">Consegna busta</option>
+            <option value="Commercialista">Commercialista</option>
+            <option value="Altro">Altro</option>
+          </select>
+        </label>
+        <label class="checkbox-field"><input id="manualTaskModalUrgentInput" type="checkbox"><span>Urgente</span></label>
+        <label class="full-width"><span>Note operative</span><textarea id="manualTaskModalNoteInput" rows="3" placeholder="Citofono, piano, persona da cercare, documento da portare..."></textarea></label>
+        <div class="form-actions full-width">
+          <button type="submit">Salva commissione</button>
+          <button id="manualTaskModalCancelButton" class="secondary" type="button">Annulla</button>
+        </div>
+      </form>
     </div>
   </div>
 
